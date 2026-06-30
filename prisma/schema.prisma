@@ -1,0 +1,225 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String?
+  firstName     String
+  lastName      String
+  matricNumber  String?   @unique
+  role          UserRole  @default(STUDENT)
+  isVerified    Boolean   @default(false)
+  avatar        String?
+  department    String?
+  level         Int?      @default(100)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+
+  profile       Profile?
+  submissions   Submission[]
+  savedCode     SavedCode[]
+  notifications Notification[]
+  activityLogs  ActivityLog[]
+  bookmarks     Bookmark[]
+
+  @@map("users")
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio         String?
+  phone       String?
+  address     String?
+  institution String   @default("Federal University")
+  faculty     String   @default("Computing")
+  preferences Json?    @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("profiles")
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  title       String
+  description String?
+  level       Int
+  semester    Int
+  creditUnits Int      @default(3)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  laboratories Laboratory[]
+
+  @@map("courses")
+}
+
+model Laboratory {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  type        LabType
+  courseId    String?
+  course      Course?       @relation(fields: [courseId], references: [id])
+  isActive    Boolean       @default(true)
+  orderIndex  Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  exercises Exercise[]
+
+  @@map("laboratories")
+}
+
+model Exercise {
+  id            String     @id @default(cuid())
+  title         String
+  description   String     @db.Text
+  instructions  String?    @db.Text
+  starterCode   String?    @db.Text
+  expectedOutput String?   @db.Text
+  testCases     Json?      @default("[]")
+  language      String?    @default("python")
+  labId         String
+  lab           Laboratory @relation(fields: [labId], references: [id], onDelete: Cascade)
+  difficulty    Difficulty @default(BEGINNER)
+  points        Int        @default(10)
+  timeLimit     Int?       @default(300)
+  isPublished   Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  submissions Submission[]
+  bookmarks   Bookmark[]
+
+  @@map("exercises")
+}
+
+model Submission {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId  String
+  exercise    Exercise         @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  code        String           @db.Text
+  output      String?          @db.Text
+  status      SubmissionStatus @default(PENDING)
+  score       Int?
+  executionTime Int?
+  memoryUsed  Int?
+  errorMessage String?         @db.Text
+  submittedAt DateTime         @default(now())
+  reviewedAt  DateTime?
+  feedback    String?          @db.Text
+
+  @@index([userId])
+  @@index([exerciseId])
+  @@map("submissions")
+}
+
+model SavedCode {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String?
+  language  String
+  code      String   @db.Text
+  labType   LabType
+  exerciseId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("saved_code")
+}
+
+model Bookmark {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, exerciseId])
+  @@map("bookmarks")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  isRead    Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("activity_logs")
+}
+
+enum UserRole {
+  STUDENT
+  LECTURER
+  ADMIN
+}
+
+enum LabType {
+  PROGRAMMING
+  WEB_DEVELOPMENT
+  DATABASE
+  OPERATING_SYSTEMS
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum SubmissionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  TIMEOUT
+  ERROR
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  SUBMISSION
+  EXERCISE
+}
